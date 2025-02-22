@@ -1,0 +1,19 @@
+{{ define "content" }}
+{{ if .IsIndex}}
+    <div class="content">
+        {{ .Body }}
+    </div>
+{{ else }}
+    <div class="contentContainer note">
+        <header>
+          <h2 id="{{ .Title }}"> {{ .Title }} </h2>
+            {{ if .Date }}
+            <time>{{ .Date }}</time>
+            {{ end}}
+        </header>
+        <article class="content">
+            {{ .Body }}
+        </article>
+    </div>
+{{ end }}
+{{ end }}

@@ -1,0 +1,16 @@
+{{define "recentNotes" }}
+
+<div class="contentContainer">
+    <header>
+        <h3>Recent Notes</h3>
+    </header>
+    <nav class="content">
+        {{ range . }}
+            {{ if not .IsIndex}}
+        <li><a href="/notes#{{.Title}}">{{.Title}}</a></li>
+            {{ end }}
+        {{end}}
+    </nav>
+</div>
+
+{{ end }}

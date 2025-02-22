@@ -1,0 +1,56 @@
+{{ define "page" }}
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+
+        <title>{{ .Title }}</title>
+
+        <meta name="viewport" content="width=device-width,initial-scale=1" />
+
+        <meta name="description" content="" />
+
+        <link rel="icon" href="assets/favicon.ico">
+        <link rel="stylesheet" href="assets/css/style.css">
+    </head>
+
+    <body>
+        <div class="sidenav">
+            <div class="contentContainer">
+                <header>
+                    <h3>pages</h3>
+                </header>
+                <nav class="content">
+                    <li><a href="/">Home</a></li>
+                    <li><a href="/notes">Notes</a></li>
+                </nav>
+            </div>
+
+            {{ .Nav }}
+        </div>
+
+        <div class="main">
+            <header>
+                <h1>{{ .Title }}</h1>
+            </header>
+            <main>
+                {{ range .Content }}
+                    {{ template "content" . }}
+                {{ end }}
+
+            </main>
+
+            <footer>
+                c. 2024
+            </footer>
+        </div>
+
+        <!-- <div class="info"> -->
+        <!--     <aside> -->
+        <!--             {{ .Info }} -->
+        <!--     </aside> -->
+        <!-- </div> -->
+
+    </body>
+</html>
+{{end}}
