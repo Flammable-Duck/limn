@@ -1,11 +1,11 @@
 package main
 
 import (
-    "flag"
-    "log"
-    "os"
-    "io/fs"
+	"flag"
+	"io/fs"
 	"limn/render"
+	"log"
+	"os"
 )
 
 var rootfs fs.FS
@@ -25,5 +25,7 @@ func main() {
     // log.Print("Printing Site Tree...")
     // builder.PrintSiteTree(root)
     rndr := render.NewRenderer(rootfs, siteDir)
-    rndr.Render()
+    rndr.BuildSiteModel()
+    // var buf *bytes.Buffer
+    // rndr.URL(buf, "/notes/note_6.md")
 }

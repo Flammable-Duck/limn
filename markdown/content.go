@@ -4,12 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"html/template"
-	"io"
 	"log"
-	"os"
-	"path/filepath"
-	"sort"
-	"strings"
 
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark-meta"
@@ -66,88 +61,17 @@ var md = goldmark.New(
         ),
     )
 
-
-type Content struct {
-    name string
-    template string
-    title string
-    body string
-    date int64
-    pinned bool
-}
-
-func (c *Content) Name() string { return c.name }
-func (c *Content) Title() string { return c.title }
-func (c *Content) Date() int64 { return c.date }
-func (c *Content) Body() template.HTML { return template.HTML(c.body) }
-func (c *Content) Pinned() bool { return c.pinned }
-func (c *Content) IsIndex() bool {
-    return filepath.Base(c.Name()) == "index.md"
-}
-
-func RenderMarkdown(templates *template.Template, w io.Writer, src string,) error {
-    content := LoadMarkdown(src)
-    if tmpl := templates.Lookup(content.template); tmpl == nil {
-        log.Printf("'%s' does not specify a valid template: '%s'", content.Title(), content.template)
-        tmpl = template.Must(template.New("blank").Parse("{{.Body}}"))
-        return tmpl.Execute(w, &content)
-    } else {
-    }
-    log.Printf("title '%s' tmpl: '%s'", content.Title(), content.template)
-    return templates.ExecuteTemplate(w, "content", &content)
-}
-
-func LoadMarkdown(path string) (c Content) {
-    c.name = path
-    file, err := os.ReadFile(path)
-    if err != nil {
-        log.Println(err)
-        c.body = "Unable to load " + path
-        return
-    }
-
+func LoadMarkdown(data []byte) (body template.HTML, metadata map[string]interface{}) {
     var buf bytes.Buffer
     context := parser.NewContext()
-    err = md.Convert(file, &buf, parser.WithContext(context))
+    err := md.Convert(data, &buf, parser.WithContext(context))
     if err != nil {
-        c.body = "Failed to parse" + path
+        body = template.HTML("Failed to parse markdown.")
         log.Println(err)
         return
     }
-    c.body = buf.String()
 
-    metaData := meta.Get(context)
-    if title, ok := metaData["Title"].(string); ok {
-        c.title = title
-        log.Printf("%s", title)
-    }
-
-    if template, ok := metaData["Template"].(string); ok {
-        c.template = strings.ToLower(template)
-        log.Printf("template: %s", template)
-    }
-
-    // log.Printf("date: %T", metaData["Date"])
-    if date, ok := metaData["Date"].(int); ok {
-        c.date = int64(date)
-    }
-
-    if pinned, ok := metaData["Pinned"].(bool); ok {
-        c.pinned = pinned
-        log.Printf("%t", pinned)
-    }
+    body = template.HTML(buf.String())
+    metadata = meta.Get(context)
     return
-}
-
-func SortContent(c []Content) []Content {
-    sort.Slice(c, func(i, j int) bool {
-        return c[i].Date() > c[j].Date()
-    })
-    sort.Slice(c, func(i, j int) bool {
-        if c[i].Pinned() { return true } else { return false }
-    })
-    sort.Slice(c, func(i, j int) bool {
-        if c[i].IsIndex() { return true } else { return false }
-    })
-    return c
 }

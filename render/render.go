@@ -1,16 +1,16 @@
 package render
 
 import (
+	"bytes"
 	"fmt"
 	"html/template"
 	"io"
 	"io/fs"
-	"limn/markdown"
 	"log"
 	"os"
 	"path"
 	"path/filepath"
-	"strings"
+	// "strings"
 )
 
 const (
@@ -18,16 +18,22 @@ const (
     ROOT_DIR = "root"
     DEST_DIR = "build"
 )
+type config struct {
+    TemplateDir string `json:"tempates"`
+    RootDir string `json:"root"`
+    BuildDir string `json:"destination"`
+}
 
 type Renderer struct {
-    templates *template.Template
+    templates map[string]*template.Template
+    site Site
     rootfs fs.FS
     dest string
     sitedir string
 }
 
 func NewRenderer(rootfs fs.FS, sitedir string) *Renderer {
-    rndr := &Renderer{rootfs: rootfs, sitedir: sitedir}
+    rndr := &Renderer{rootfs: rootfs, sitedir: sitedir, site:*NewSite()}
     if err := rndr.checkTree(); err != nil {
         log.Fatal(err)
     }
@@ -65,63 +71,63 @@ func (rndr *Renderer) checkTree() error {
     return nil
 }
 
+// blog.questionable.services/article/approximating-html-template-inheritance
 func (rndr *Renderer) initTemplates() error {
-    rndr.templates = template.Must(template.ParseFS(rndr.fs(),
-        filepath.Join(TMPL_DIR, "*html")))
+    rndr.templates = make(map[string]*template.Template)
+    // template.Must(template.ParseFS(rndr.fs(),
+    //     filepath.Join(TMPL_DIR, "*html")))
+    layouts, err := fs.Glob(rndr.rootfs,
+        filepath.Join(TMPL_DIR, "layouts/*.html"))
+    if err != nil {
+        return err
+    }
+    log.Printf("layouts: %v", layouts)
+
+    includes, err := fs.Glob(rndr.rootfs,
+        filepath.Join(TMPL_DIR, "includes/*.html"))
+    if err != nil {
+        return err
+    }
+
+    for _, layout := range layouts {
+        files := append(includes, layout)
+        rndr.templates[filepath.Base(layout)] = template.Must(
+            template.ParseFiles(files...))
+    }
+
     log.Print("initTemplates: templates loaded")
     return nil
 }
 
-func (rndr *Renderer) Render() {
+func (rndr *Renderer) BuildSiteModel() {
     wd, err := os.Getwd()
     if err != nil { log.Fatal(err) }
     wd = path.Join(wd, rndr.sitedir)
+    // var site Site = *NewSite()
     rndrFunc := func(path string, d fs.DirEntry, err error) error {
         if err != nil {
             log.Fatal(err)
         }
-
-        dest, _ := strings.CutPrefix(path, ROOT_DIR)
-        dest = filepath.Join(wd, DEST_DIR, dest)
-        src := filepath.Join(wd, path)
-
         if d.IsDir() {
-            log.Printf("dir: %s/", d.Name())
-            if err := os.Mkdir(dest,  0750); err != nil {
-                log.Fatal(err)
-            }
             return nil
         }
 
-        switch filepath.Ext(d.Name()) {
-        case ".md":
-            log.Printf("markdown: %s", d.Name())
-            // markdown.LoadContent
-            dest = strings.TrimSuffix(dest, filepath.Ext(dest)) + ".html"
-            fout, err := os.Create(dest)
-            if err != nil {
-                log.Fatal(err)
-            }
-            defer fout.Close()
-            err = markdown.RenderMarkdown(rndr.templates, fout, src)
-            if err != nil {
-                log.Fatal(err)
-            }
-        default:
-            log.Printf("other: %s", d.Name())
-            log.Printf(">> %s", dest)
-            fin, err := os.Open(src)
-            if err != nil {
-                log.Fatal(err)
-            }
-            defer fin.Close()
-            fout, err := os.Create(dest)
-            if err != nil {
-                log.Fatal(err)
-            }
-            defer fout.Close()
+        // filename := filepath.Base(path)
+        // page, _ := strings.CutPrefix(filepath.Dir(path), ROOT_DIR)
+        page, filename := filepath.Split(path)
+        src := filepath.Join(wd, path)
+        if page == "" { page = "/" }
 
-            io.Copy(fout, fin)
+        log.Printf("\npath: '%s'\n page: '%s'\n filename: '%s'\n src: %s",
+            path, page, filename, src)
+
+        if filepath.Ext(filename) == ".md" {
+            log.Printf("markdown: %s", d.Name())
+            mdat, err := os.ReadFile(src)
+            if err != nil { return err }
+            
+            rndr.site.Page(page).AddNote(filename, NewNote(mdat))
+            return nil
         }
 
         return nil
@@ -130,4 +136,40 @@ func (rndr *Renderer) Render() {
     os.RemoveAll(path.Join(wd, DEST_DIR))
 
     fs.WalkDir(rndr.fs(), ROOT_DIR, rndrFunc)
+    fmt.Println(rndr.site)
+}
+
+func (rndr *Renderer) URL(w io.Writer, url string) error {
+    path, name := filepath.Split(url)
+    log.Printf("URL: %s + %s", path, name)
+    var buf *bytes.Buffer
+    page := rndr.site.Page(path)
+    if name == "" {
+        err := page.Render(buf, rndr.templates[page.Template()])
+        if err != nil { return err }
+        w.Write(buf.Bytes()); return nil
+    }
+    note := page.Notes()[name]
+    err := note.Render(buf, rndr.templates[page.Template()])
+    if err != nil { return err }
+    w.Write(buf.Bytes())
+    return nil
+}
+
+func (rndr *Renderer) renderTemplate(
+    w io.Writer, name string, data interface{}) error {
+    var b bytes.Buffer
+    tmpl, ok := rndr.templates[name]
+    // TODO: if template not defined (name == ""), use generic template instead
+    if !ok {
+        return fmt.Errorf("template '%s' not found", name)
+    }
+
+    log.Printf("using template %s (%s)", tmpl.Name(), name)
+    err := tmpl.ExecuteTemplate(&b, "base", data)
+    if err != nil {
+        return err
+    }
+    _, err = b.WriteTo(w)
+    return err
 }
