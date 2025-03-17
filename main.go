@@ -4,6 +4,7 @@ import (
 	"flag"
 	"io/fs"
 	"limn/render"
+    "limn/build"
 	"log"
 	"os"
 )
@@ -12,7 +13,6 @@ var rootfs fs.FS
 var siteDir string
 
 func init() {
-    // var err error
     flag.StringVar(&siteDir, "dir", ".", "project directory")
     flag.Parse()
     rootfs = os.DirFS(".")
@@ -22,10 +22,12 @@ func init() {
 }
 
 func main() {
-    // log.Print("Printing Site Tree...")
-    // builder.PrintSiteTree(root)
     rndr := render.NewRenderer(rootfs, siteDir)
     rndr.BuildSiteModel()
-    // var buf *bytes.Buffer
-    // rndr.URL(buf, "/notes/note_6.md")
+    siteFunc := func(p string, c render.Content) error {
+        log.Printf("%-40s%s\n", p, c.Template())
+        return nil
+    }
+    rndr.WalkSite(siteFunc)
+    build.BuildSite(rndr, siteDir)
 }

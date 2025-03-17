@@ -1,5 +1,5 @@
 ---
 Title: Home
-Template: base.html
+Template: page
 ---
 This is the main content of my index.

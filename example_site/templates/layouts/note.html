@@ -1,0 +1,10 @@
+{{ define "note" }}
+<article>
+    <h2> {{ .Title }} </h2>
+    {{ template "noteBody" . }}
+</article>
+{{ end }}
+
+{{ define "noteBody" }}
+    {{ .Body }}
+{{ end }}

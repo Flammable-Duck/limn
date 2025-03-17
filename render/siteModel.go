@@ -1,10 +1,11 @@
 package render
 
 import (
-	"fmt"
-	"html/template"
-	"io"
-	"limn/markdown"
+    "fmt"
+    "html/template"
+    "io"
+    "limn/markdown"
+    "path/filepath"
 )
 
 type Content interface {
@@ -12,36 +13,32 @@ type Content interface {
     Template() string
 }
 
-type html struct {}
-
 type Asset struct {
     data []byte
 }
 var _ Content = &Asset{}
 
 type Note struct {
-    html
     body template.HTML
     metadata map[string]interface{}
 }
 var _ Content = &Note{}
 
 type Page struct {
-    html
     notes map[string]*Note
 }
 var _ Content = &Page{}
 
 type Site struct {
     pages map[string]*Page
-}
-
-func (n *html) Render(w io.Writer, tmpl *template.Template) error {
-    return tmpl.Execute(w, n)
+    assets map[string]map[string]*Asset
 }
 
 func NewSite() *Site {
-    return &Site{pages: make(map[string]*Page)}
+    return &Site{
+        pages: make(map[string]*Page),
+        assets: make(map[string]map[string]*Asset),
+    }
 }
 func (s *Site) Page(path string) *Page {
     _, ok := s.pages[path]
@@ -49,6 +46,13 @@ func (s *Site) Page(path string) *Page {
         s.pages[path] = NewPage()
     }
     return s.pages[path]
+}
+func (s *Site) AddAsset(path string, a *Asset) {
+    dirName, name := filepath.Split(path)
+    if _, ok := s.assets[dirName]; !ok {
+        s.assets[dirName] = make(map[string]*Asset)
+    }
+    s.assets[dirName][name] = a
 }
 func (s Site) String() (str string) {
     for name, page := range s.pages {
@@ -70,12 +74,12 @@ func (p *Page) Notes() map[string]*Note {
     return p.notes
 }
 func (p *Page) Title() string {
-    index, ok := p.Notes()["index.md"]
+    index, ok := p.Notes()["index.html"]
     if !ok { return "" }
     return index.Title()
 }
 func (p *Page) Template() string {
-    index, ok := p.Notes()["index.md"]
+    index, ok := p.Notes()["index.html"]
     if !ok { return "" }
     return index.Template()
 }
@@ -85,6 +89,13 @@ func (p Page) String() (str string) {
             str, name, note.Title())
     }
     return
+}
+func (p *Page) Render(w io.Writer, tmpl *template.Template) error {
+    err := tmpl.ExecuteTemplate(w, p.Template(), p)
+    if err != nil {
+        return fmt.Errorf("%s: %s", p.Title(), err.Error())
+    }
+    return nil
 }
 
 func NewAsset(data []byte) (a *Asset) {
@@ -119,4 +130,11 @@ func (n *Note) Template() string {
     template, ok := t.(string)
     if !ok { return "" }
     return template
+}
+func (n *Note) Render(w io.Writer, tmpl *template.Template) error {
+    err := tmpl.ExecuteTemplate(w, n.Template(), n)
+    if err != nil {
+        return fmt.Errorf("%s: %s", n.Title(), err.Error())
+    }
+    return nil
 }
