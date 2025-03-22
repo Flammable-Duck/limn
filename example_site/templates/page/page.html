@@ -9,7 +9,7 @@
                 {{ (index .Content.Notes .NoteName).Body }}
                 <ol>
                 {{ range $name, $note := .Content.Notes }}
-                    {{ if eq $name "index.html"}} {{break}} {{end}}
+                    {{ if eq $name "index.html"}} {{continue}} {{end}}
                     <li><a href="{{ $name }}">{{ $note.Title }} </a></li>
                 {{ end }}
                 </ol>
