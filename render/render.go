@@ -61,7 +61,6 @@ func (rndr *Renderer) checkTree() error {
     log.Print("checkTree: tree ok")
     return nil
 }
-// blog.questionable.services/article/approximating-html-template-inheritance
 func (rndr *Renderer) initTemplates() error {
     rndr.templates = template.Must(template.ParseFS(rndr.fs(),
         filepath.Join(TMPL_DIR, "*/*html")))
@@ -91,6 +90,7 @@ func (rndr *Renderer) BuildSiteModel() {
 
         if filepath.Ext(filename) == ".md" {
             filename := strings.TrimSuffix(filename, "md") + "html"
+            rndr.site.AddPage(page)
             rndr.site.Page(page).AddNote(filename, NewNote(dat))
             return nil
         }
@@ -108,18 +108,21 @@ func (rndr *Renderer) Template() *template.Template {
 }
 func (rndr *Renderer) URL(w io.Writer, url string) error {
     path, name := filepath.Split(url)
-    path = strings.TrimSuffix(path, "/")
-    log.Printf("URL: %s/%s", path, name)
+    if path != "/" {
+        path = strings.TrimSuffix(path, "/")
+    }
+    log.Printf("URL: %s%s", path, name)
     var buf bytes.Buffer
     page := rndr.site.Page(path)
+    log.Printf("page title: %s", page.Title())
     if name == "" {
-        err := page.Render(&buf, rndr.Template())
+        err := page.Render(&buf, rndr.Template(), url)
         if err != nil { return err }
         w.Write(buf.Bytes()); return nil
     }
     note, ok := page.Notes()[name]
     if !ok { return fmt.Errorf("404")}
-    err := note.Render(&buf, rndr.Template())
+    err := note.Render(&buf, rndr.Template(), url)
     if err != nil { return err }
     w.Write(buf.Bytes())
     return nil

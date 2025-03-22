@@ -1,0 +1,18 @@
+{{ define "page" }}
+        <div id="page">
+            <header>
+                <p>{{ .Path }}</p>
+                <h1>{{ .Content.Title }}</h1>
+            </header>
+            <main>
+                {{ $page := . }}
+                {{ (index .Content.Notes .NoteName).Body }}
+                <ol>
+                {{ range $name, $note := .Content.Notes }}
+                    {{ if eq $name "index.html"}} {{break}} {{end}}
+                    <li><a href="{{ $name }}">{{ $note.Title }} </a></li>
+                {{ end }}
+                </ol>
+            </main>
+        </div>
+{{end}}

@@ -17,7 +17,7 @@ func BuildSite(site *render.Renderer, siteDir string) {
 
         log.Printf("rendering %s", name)
         log.Printf("%s", absPath)
-        ctnt.Render(buf, site.Template())
+        ctnt.Render(buf, site.Template(), path)
         if dir != "" {
             log.Printf("making dir %s", dir)
             if err := os.MkdirAll(dir, 0777); err != nil {
@@ -27,7 +27,6 @@ func BuildSite(site *render.Renderer, siteDir string) {
         var err error
         switch filepath.Ext(name){
         case ".html":
-            log.Printf(">>> %s", absPath)
             err = os.WriteFile(absPath, buf.Bytes(), 0777)
         case "":
             if err := os.MkdirAll(absPath, 0777); err != nil {
