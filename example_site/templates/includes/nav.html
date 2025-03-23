@@ -1,8 +1,8 @@
 {{ define "nav" }}
 <nav>
     <ol>
-        {{ range $path, $note := .Notes}}
-        <li><a href="{{$path}}">{{ .Title }}</a></li>
+        {{ range $path, $page := . }}
+        <li><a href="{{$path}}">{{ $page.Title }}</a></li>
         {{ end }}
     </ol>
 </nav>

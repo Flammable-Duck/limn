@@ -8,16 +8,28 @@ import (
 	"path/filepath"
 )
 
-func BuildSite(site *render.Renderer, siteDir string) {
+func BuildSite(rndr *render.Renderer, siteDir string) {
     rndrfnc := func(path string,ctnt render.Content) error {
-        buf := bytes.NewBuffer([]byte{})
-        absPath := filepath.Join(siteDir, "build", path)
+        url := render.URL(path)
+        absPath := filepath.Join(siteDir, "build", url.Path())
         dir, name := filepath.Split(absPath)
+        buf := bytes.NewBuffer([]byte{})
+
         if name == "index.html" { return nil }
 
-        log.Printf("rendering %s", name)
+        log.Printf("rendering %s", url.NoteName())
         log.Printf("%s", absPath)
-        ctnt.Render(buf, site.Template(), path)
+        if filepath.Ext(url.Path()) == ".html" ||
+            filepath.Ext(url.Path()) == "" {
+            rndr.Site().Render(buf, rndr.Template(), url.Path())
+        } else {
+            // return nil
+            err := rndr.URL(buf, url.Path())
+            if err != nil {
+                return err
+            }
+        }
+
         if dir != "" {
             log.Printf("making dir %s", dir)
             if err := os.MkdirAll(dir, 0777); err != nil {
@@ -46,7 +58,7 @@ func BuildSite(site *render.Renderer, siteDir string) {
     }
     os.RemoveAll(filepath.Join(siteDir, "build"))
     os.Mkdir(filepath.Join(siteDir, "build"), 0777)
-    err := site.WalkSite(rndrfnc)
+    err := rndr.WalkSite(rndrfnc)
     if err != nil { log.Fatal(err) }
 }
 

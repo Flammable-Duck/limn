@@ -1,0 +1,9 @@
+{{ define "base" }}
+<!DOCTYPE html>
+<html lang="en">
+    {{ template "head"   . }}
+    {{ template "nav"    .Content.Pages }}
+    {{ template "page"   (PageWithURL (.Content.Page .PageName) .Path) }}
+    {{ template "footer" . }}
+</html>
+{{end}}

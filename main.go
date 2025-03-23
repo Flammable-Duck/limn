@@ -1,7 +1,6 @@
 package main
 
 import (
-	// "bytes"
 	"flag"
 	"io/fs"
 	"limn/build"
@@ -32,6 +31,7 @@ func main() {
     rndr.WalkSite(siteFunc)
     build.BuildSite(rndr, siteDir)
     // buf := bytes.NewBuffer([]byte{})
-    // rndr.URL(buf, "/")
+    // err := rndr.URL(buf, "/contact.html")
+    // if err != nil { log.Fatal(err) }
     // log.Println(buf.String())
 }

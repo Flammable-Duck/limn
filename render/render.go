@@ -14,10 +14,19 @@ import (
 )
 
 const (
-    TMPL_DIR = "templates"
     ROOT_DIR = "root"
     DEST_DIR = "build"
+    TMPL_DIR = "templates"
+
+    SITE_TMPL = "base"
 )
+
+var funcMap = template.FuncMap{
+    "SiteWithURL": UrlWrap[*Site],
+    "PageWithURL": UrlWrap[*Page],
+    "NoteWithURL": UrlWrap[*Note],
+}
+
 type config struct {
     TemplateDir string `json:"tempates"`
     RootDir string `json:"root"`
@@ -62,7 +71,8 @@ func (rndr *Renderer) checkTree() error {
     return nil
 }
 func (rndr *Renderer) initTemplates() error {
-    rndr.templates = template.Must(template.ParseFS(rndr.fs(),
+    rndr.templates = template.Must(
+        template.New("templates").Funcs(funcMap).ParseFS(rndr.fs(),
         filepath.Join(TMPL_DIR, "*/*html")))
     log.Print(rndr.templates.DefinedTemplates())
     return nil
@@ -79,22 +89,23 @@ func (rndr *Renderer) BuildSiteModel() {
             return nil
         }
 
-        page, filename := filepath.Split(path)
-        page = strings.TrimSuffix(strings.TrimPrefix(page, ROOT_DIR), "/")
         src := filepath.Join(wd, path)
-        if page == "" { page = "/" }
+        url := URL(strings.TrimPrefix(path, ROOT_DIR))
 
         log.Printf("loading file: %s", d.Name())
         dat, err := os.ReadFile(src)
         if err != nil { return err }
 
-        if filepath.Ext(filename) == ".md" {
-            filename := strings.TrimSuffix(filename, "md") + "html"
-            rndr.site.AddPage(page)
-            rndr.site.Page(page).AddNote(filename, NewNote(dat))
+        if filepath.Ext(url.NoteName()) == ".md" {
+            url = URL( strings.TrimSuffix(
+                url.String(), "md") + "html")
+            rndr.site.AddPage(url.PageName())
+            rndr.site.Page(
+                url.PageName()).AddNote(url.NoteName(),
+                NewNote(dat))
             return nil
         }
-        rndr.site.AddAsset(filepath.Join(page, filename), NewAsset(dat))
+        rndr.site.AddAsset(url.Path(), NewAsset(dat))
         return nil
     }
 
@@ -106,24 +117,38 @@ func (rndr *Renderer) BuildSiteModel() {
 func (rndr *Renderer) Template() *template.Template {
     return rndr.templates
 }
-func (rndr *Renderer) URL(w io.Writer, url string) error {
-    path, name := filepath.Split(url)
-    if path != "/" {
-        path = strings.TrimSuffix(path, "/")
+func (rndr *Renderer) Site() *Site {
+    return &rndr.site
+}
+func (rndr *Renderer) URL(w io.Writer, path string) error {
+    url := URL(path)
+    buf := bytes.NewBuffer([]byte{})
+    page, ok := rndr.site.Pages()[url.PageName()]
+    if !ok {
+        asset, ok := rndr.site.assets[url.PageName()][url.NoteName()]
+        if !ok {
+            return fmt.Errorf("path %s content %s not found.",
+                url.PageName(), url.NoteName())
+        }
+        asset.Render(buf, rndr.Template(), asset.Template())
+        w.Write(buf.Bytes())
+        return nil
     }
-    log.Printf("URL: %s%s", path, name)
-    var buf bytes.Buffer
-    page := rndr.site.Page(path)
-    log.Printf("page title: %s", page.Title())
-    if name == "" {
-        err := page.Render(&buf, rndr.Template(), url)
-        if err != nil { return err }
-        w.Write(buf.Bytes()); return nil
+    var err error
+    if url.NoteName() == "index.html" {
+        err = page.Render(buf, rndr.Template(), page.Template())
+    } else {
+        ctnt, ok := page.Notes()[url.NoteName()]
+        if !ok {
+            return fmt.Errorf("Page %s Note %s not found.",
+                url.PageName(), url.NoteName())
+        }
+        err = ctnt.Render(buf, rndr.Template(), ctnt.Template())
     }
-    note, ok := page.Notes()[name]
-    if !ok { return fmt.Errorf("404")}
-    err := note.Render(&buf, rndr.Template(), url)
-    if err != nil { return err }
+    if err != nil {
+        return err
+    }
+
     w.Write(buf.Bytes())
     return nil
 }

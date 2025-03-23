@@ -7,6 +7,7 @@ import (
 	"limn/markdown"
 	"log"
 	"path/filepath"
+	"strings"
 )
 
 type Content interface {
@@ -30,17 +31,25 @@ type Page struct {
 }
 var _ Content = &Page{}
 
-type _URL string;
-func (path _URL) Path() string {
+type URL string;
+func (path URL) String() string {
     return string(path)
 }
-func (path _URL) PageName() string {
-    pageName, _ := filepath.Split(string(path))
-    return pageName
+func (path URL) Path() string {
+    return path.String()
 }
-func (path _URL) NoteName() string {
-    _, noteName := filepath.Split(path.Path())
-    log.Printf("####>>>>####>>>> %s, %s", path, noteName)
+func (path URL) PageName() string {
+    dir, name := filepath.Split(path.String())
+    if filepath.Ext(name) == "" {
+        dir = path.String()
+    }
+    if !strings.HasSuffix(dir, "/") {
+        dir = fmt.Sprintf("%s/", dir)
+    }
+    return dir
+}
+func (path URL) NoteName() string {
+    noteName := filepath.Base(path.String())
     if noteName == "" || filepath.Ext(path.Path()) == "" {
         return "index.html"
     }
@@ -48,10 +57,10 @@ func (path _URL) NoteName() string {
 }
 type UrlWrapper[S Content] struct {
     Content S
-    _URL
+    URL
 }
 func UrlWrap[S Content](c S, path string) UrlWrapper[S] {
-    return UrlWrapper[S]{c, _URL(path)}
+    return UrlWrapper[S]{c, URL(path)}
 }
 
 type Site struct {
@@ -83,6 +92,25 @@ func (s *Site) AddAsset(path string, a *Asset) {
         s.assets[dirName] = make(map[string]*Asset)
     }
     s.assets[dirName][name] = a
+}
+func (s *Site) Title() string {
+    p, ok := s.pages["/"]
+    if !ok { return "" }
+    return p.Title()
+}
+func (s *Site) Pages() map[string]*Page {
+    return s.pages
+}
+func (s *Site) Template() string {
+    return SITE_TMPL
+}
+func (s *Site) Render(w io.Writer, tmpl *template.Template, path string) error {
+    wrapper := UrlWrap(s, path)
+    err := tmpl.ExecuteTemplate(w, s.Template(), wrapper)
+    if err != nil {
+        return fmt.Errorf("%s: %s", s.Title(), err.Error())
+    }
+    return nil
 }
 func (s Site) String() (str string) {
     for name, page := range s.pages {
