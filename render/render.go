@@ -123,8 +123,28 @@ func (rndr *Renderer) Site() *Site {
 func (rndr *Renderer) URL(w io.Writer, path string) error {
     url := URL(path)
     buf := bytes.NewBuffer([]byte{})
-    page, ok := rndr.site.Pages()[url.PageName()]
-    if !ok {
+    switch filepath.Ext(url.Path()) {
+    case ".html":
+        page, ok := rndr.site.Pages()[url.PageName()]
+        if !ok {
+            return fmt.Errorf("path %s page %s not found.",
+                url.Path(), url.PageName())
+        }
+        var err error
+        if url.NoteName() == "index.html" {
+            err = page.Render(buf, rndr.Template(), page.Template())
+        } else {
+            ctnt, ok := page.Notes()[url.NoteName()]
+            if !ok {
+                return fmt.Errorf("Page %s Note %s not found.",
+                    url.PageName(), url.NoteName())
+            }
+            err = ctnt.Render(buf, rndr.Template(), ctnt.Template())
+        }
+        if err != nil {
+            return err
+        }
+    default:
         asset, ok := rndr.site.assets[url.PageName()][url.NoteName()]
         if !ok {
             return fmt.Errorf("path %s content %s not found.",
@@ -134,21 +154,6 @@ func (rndr *Renderer) URL(w io.Writer, path string) error {
         w.Write(buf.Bytes())
         return nil
     }
-    var err error
-    if url.NoteName() == "index.html" {
-        err = page.Render(buf, rndr.Template(), page.Template())
-    } else {
-        ctnt, ok := page.Notes()[url.NoteName()]
-        if !ok {
-            return fmt.Errorf("Page %s Note %s not found.",
-                url.PageName(), url.NoteName())
-        }
-        err = ctnt.Render(buf, rndr.Template(), ctnt.Template())
-    }
-    if err != nil {
-        return err
-    }
-
     w.Write(buf.Bytes())
     return nil
 }
