@@ -187,6 +187,13 @@ func (n *Note) Template() string {
     if !ok { return "" }
     return template
 }
+func (n *Note) CoverImgURL() string {
+    d, ok := n.metadata["CoverImg"]
+    if !ok { return "" }
+    url, ok := d.(string)
+    if !ok { return "" }
+    return url
+}
 func (n *Note) Render(w io.Writer, tmpl *template.Template, path string) error {
     wrapper := UrlWrap(n, path)
     err := tmpl.ExecuteTemplate(w, n.Template(), wrapper)
