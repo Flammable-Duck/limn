@@ -12,10 +12,13 @@ import (
 	"github.com/yuin/goldmark/parser"
 	"github.com/yuin/goldmark/renderer/html"
 	"github.com/yuin/goldmark/util"
+	"github.com/yuin/goldmark/ast"
+	"github.com/yuin/goldmark/text"
 
 	"github.com/yuin/goldmark-emoji"
 	east "github.com/yuin/goldmark-emoji/ast"
 	"github.com/yuin/goldmark-emoji/definition"
+
 )
 
 const emojiPath string = "/assets/emotes"
@@ -41,20 +44,45 @@ func renderEmojis(w util.BufWriter, source []byte, n *east.Emoji,
     fmt.Fprintf(w, emojiTemplate, n.Value.Name, n.Value.Name)
 }
 
+type wrapImageTransformer struct {}
+func (t *wrapImageTransformer) Transform(
+    node *ast.Document, reader text.Reader, pc parser.Context) {
+    var images []*ast.Image
+    ast.Walk(node, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+        if imageNode, ok := n.(*ast.Image); ok && entering {
+            images = append(images, imageNode)
+		}
+        return ast.WalkContinue, nil
+    })
+    for _, imageNode := range images {
+        if imageNode.Parent() != nil {
+            imgWrapper := ast.NewParagraph()
+            imgWrapper.SetAttribute([]byte("class"), "imgWrapper")
+            parent := imageNode.Parent()
+            sibiling := imageNode.PreviousSibling()
+            imgWrapper.AppendChild(imgWrapper, imageNode)
+            parent.InsertAfter(parent, sibiling, imgWrapper)
+        }
+    }
+}
+
 var md = goldmark.New(
     goldmark.WithExtensions(
         extension.GFM,
         meta.Meta,
-			emoji.New(
-				emoji.WithEmojis(
-					definition.NewEmojis(Emojis...),
-				),
-				emoji.WithRenderingMethod(emoji.Func),
-				emoji.WithRendererFunc(renderEmojis),
-			),
+        emoji.New(
+            emoji.WithEmojis(
+                definition.NewEmojis(Emojis...),
+            ),
+            emoji.WithRenderingMethod(emoji.Func),
+            emoji.WithRendererFunc(renderEmojis),
+        ),
         ),
     goldmark.WithParserOptions(
         parser.WithAutoHeadingID(),
+        parser.WithASTTransformers(
+            util.Prioritized(&wrapImageTransformer{} ,9999),
+            ),
         ),
     goldmark.WithRendererOptions(
             html.WithUnsafe(),
