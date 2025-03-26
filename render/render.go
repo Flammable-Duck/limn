@@ -7,18 +7,12 @@ import (
 	"io"
 	"io/fs"
 	"log"
+    "limn/config"
+    "limn/markdown"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
-)
-
-const (
-    ROOT_DIR = "root"
-    DEST_DIR = "build"
-    TMPL_DIR = "templates"
-
-    SITE_TMPL = "base"
 )
 
 var funcMap = template.FuncMap{
@@ -27,22 +21,26 @@ var funcMap = template.FuncMap{
     "NoteWithURL": UrlWrap[*Note],
 }
 
-type config struct {
-    TemplateDir string `json:"tempates"`
-    RootDir string `json:"root"`
-    BuildDir string `json:"destination"`
-}
-
 type Renderer struct {
     templates *template.Template
-    site Site
     rootfs fs.FS
+    site Site
+    mdRndr *markdown.MarkdownRenderer
+    config config.Config
     dest string
     sitedir string
 }
 
 func NewRenderer(rootfs fs.FS, sitedir string) *Renderer {
     rndr := &Renderer{rootfs: rootfs, sitedir: sitedir, site:*NewSite()}
+    if cfg, err := fs.Stat(rndr.fs(), "config.json"); err != nil ||
+    cfg.IsDir() {
+        rndr.config = config.DefaultConfig()
+    } else if err := rndr.loadConfig(); err != nil {
+        log.Fatal(err)
+    }
+    log.Printf("config:\n---\n%s\n---", rndr.config)
+    rndr.mdRndr = markdown.NewRenderer(&rndr.config)
     if err := rndr.checkTree(); err != nil {
         log.Fatal(err)
     }
@@ -51,31 +49,41 @@ func NewRenderer(rootfs fs.FS, sitedir string) *Renderer {
     }
     return rndr
 }
-func (rndr *Renderer) fs() (subfs fs.FS) {
-    var err error
-    subfs, err = fs.Sub(rndr.rootfs, rndr.sitedir)
-    if err != nil { log.Fatal(err) }
-    return
-}
 func (rndr *Renderer) checkTree() error {
     log.Printf("%s", rndr.rootfs)
-    if tmpldir, err := fs.Stat(rndr.fs(), TMPL_DIR); err != nil ||
+    if tmpldir, err := fs.Stat(rndr.fs(), rndr.config.Paths.Templates); err != nil ||
     !tmpldir.IsDir() {
         return fmt.Errorf("templates dir not found in site tree.")
     }
-    if rootdir, err := fs.Stat(rndr.fs(), ROOT_DIR); err != nil ||
+    if rootdir, err := fs.Stat(rndr.fs(), rndr.config.Paths.Root); err != nil ||
     !rootdir.IsDir() {
         return fmt.Errorf("root dir not found in site tree.")
     }
     log.Print("checkTree: tree ok")
     return nil
 }
+func (rndr *Renderer) loadConfig() error {
+    wd, err := os.Getwd()
+    if err != nil { return err }
+    wd = path.Join(wd, rndr.sitedir)
+    data, err := os.ReadFile(filepath.Join(wd, "config.json"))
+    cfg, err := config.ReadConfig(data)
+    if err != nil { return err }
+    rndr.config = cfg
+    return nil
+}
 func (rndr *Renderer) initTemplates() error {
     rndr.templates = template.Must(
         template.New("templates").Funcs(funcMap).ParseFS(rndr.fs(),
-        filepath.Join(TMPL_DIR, "*/*html")))
+        filepath.Join(rndr.config.Paths.Templates, "*/*html")))
     log.Print(rndr.templates.DefinedTemplates())
     return nil
+}
+func (rndr *Renderer) fs() (subfs fs.FS) {
+    var err error
+    subfs, err = fs.Sub(rndr.rootfs, rndr.sitedir)
+    if err != nil { log.Fatal(err) }
+    return
 }
 func (rndr *Renderer) BuildSiteModel() {
     wd, err := os.Getwd()
@@ -90,7 +98,7 @@ func (rndr *Renderer) BuildSiteModel() {
         }
 
         src := filepath.Join(wd, path)
-        url := URL(strings.TrimPrefix(path, ROOT_DIR))
+        url := URL(strings.TrimPrefix(path, rndr.config.Paths.Root))
 
         log.Printf("loading file: %s", d.Name())
         dat, err := os.ReadFile(src)
@@ -100,18 +108,19 @@ func (rndr *Renderer) BuildSiteModel() {
             url = URL( strings.TrimSuffix(
                 url.String(), "md") + "html")
             rndr.site.AddPage(url.PageName())
+            md, meta := rndr.mdRndr.LoadMarkdown(dat)
             rndr.site.Page(
                 url.PageName()).AddNote(url.NoteName(),
-                NewNote(dat))
+                NewNote(md, meta))
             return nil
         }
         rndr.site.AddAsset(url.Path(), NewAsset(dat))
         return nil
     }
 
-    os.RemoveAll(path.Join(wd, DEST_DIR))
+    os.RemoveAll(path.Join(wd, rndr.config.Paths.Build))
 
-    fs.WalkDir(rndr.fs(), ROOT_DIR, rndrFunc)
+    fs.WalkDir(rndr.fs(), rndr.config.Paths.Root, rndrFunc)
     fmt.Println(rndr.site)
 }
 func (rndr *Renderer) Template() *template.Template {

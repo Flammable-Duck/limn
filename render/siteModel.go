@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"html/template"
 	"io"
-	"limn/markdown"
 	"log"
 	"path/filepath"
 	"strings"
 )
+
 
 type Content interface {
     Render(io.Writer, *template.Template, string) error
@@ -102,7 +102,7 @@ func (s *Site) Pages() map[string]*Page {
     return s.pages
 }
 func (s *Site) Template() string {
-    return SITE_TMPL
+    return "base"
 }
 func (s *Site) Render(w io.Writer, tmpl *template.Template, path string) error {
     wrapper := UrlWrap(s, path)
@@ -165,10 +165,8 @@ func (a *Asset) Template() string {
     return "raw"
 }
 
-func NewNote(data []byte) *Note {
-    n := &Note{}
-    n.body, n.metadata = markdown.LoadMarkdown(data)
-    return n
+func NewNote(body template.HTML, meta map[string]interface{}) *Note {
+    return &Note{body: body, metadata: meta}
 }
 func (n *Note) Body() template.HTML {
     return n.body

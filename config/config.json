@@ -1,0 +1,14 @@
+{
+    "paths": {
+        "templates": "templates",
+        "root": "root",
+        "build": "build"
+    },
+    "default templates": {
+        "notes": "note",
+        "pages": "page",
+        "site": "base"
+    },
+    "emojis": [
+    ]
+}
