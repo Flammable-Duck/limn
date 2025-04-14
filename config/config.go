@@ -21,6 +21,7 @@ type Config struct {
 		Pages string `json:"pages"`
 		Site  string `json:"site"`
 	} `json:"default templates"`
+	Scripts map[string]string `json:"scripts"`
 	Emojis []struct {
 		Path string `json:"path"`
 		Name string `json:"name"`
