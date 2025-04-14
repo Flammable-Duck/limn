@@ -1,18 +1,18 @@
 package render
 
 import (
-	"bytes"
-	"fmt"
-	"html/template"
-	"io"
-	"io/fs"
-	"log"
+    "bytes"
+    "fmt"
+    "html/template"
+    "io"
+    "io/fs"
+    "log"
     "limn/config"
     "limn/markdown"
-	"os"
-	"path"
-	"path/filepath"
-	"strings"
+    "os"
+    "path"
+    "path/filepath"
+    "strings"
 )
 
 var funcMap = template.FuncMap{
@@ -39,7 +39,6 @@ func NewRenderer(rootfs fs.FS, sitedir string) *Renderer {
     } else if err := rndr.loadConfig(); err != nil {
         log.Fatal(err)
     }
-    log.Printf("config:\n---\n%s\n---", rndr.config)
     rndr.mdRndr = markdown.NewRenderer(&rndr.config)
     if err := rndr.checkTree(); err != nil {
         log.Fatal(err)
@@ -50,7 +49,6 @@ func NewRenderer(rootfs fs.FS, sitedir string) *Renderer {
     return rndr
 }
 func (rndr *Renderer) checkTree() error {
-    log.Printf("%s", rndr.rootfs)
     if tmpldir, err := fs.Stat(rndr.fs(), rndr.config.Paths.Templates); err != nil ||
     !tmpldir.IsDir() {
         return fmt.Errorf("templates dir not found in site tree.")
@@ -63,10 +61,7 @@ func (rndr *Renderer) checkTree() error {
     return nil
 }
 func (rndr *Renderer) loadConfig() error {
-    wd, err := os.Getwd()
-    if err != nil { return err }
-    wd = path.Join(wd, rndr.sitedir)
-    data, err := os.ReadFile(filepath.Join(wd, "config.json"))
+    data, err := os.ReadFile(filepath.Join(rndr.Wd(), "config.json"))
     cfg, err := config.ReadConfig(data)
     if err != nil { return err }
     rndr.config = cfg
@@ -75,15 +70,16 @@ func (rndr *Renderer) loadConfig() error {
 func (rndr *Renderer) initTemplates() error {
     rndr.templates = template.Must(
         template.New("templates").Funcs(funcMap).ParseFS(rndr.fs(),
-        filepath.Join(rndr.config.Paths.Templates, "*/*html")))
-    log.Print(rndr.templates.DefinedTemplates())
+            filepath.Join(rndr.config.Paths.Templates, "*/*html")))
     return nil
 }
-func (rndr *Renderer) fs() (subfs fs.FS) {
-    var err error
-    subfs, err = fs.Sub(rndr.rootfs, rndr.sitedir)
-    if err != nil { log.Fatal(err) }
-    return
+func (rndr *Renderer) Wd() string {
+    wd, _ := os.Getwd()
+    // if err != nil { return err }
+    return path.Join(wd, rndr.sitedir)
+}
+func (rndr *Renderer) fs() fs.FS {
+    return rndr.rootfs
 }
 func (rndr *Renderer) BuildSiteModel() {
     wd, err := os.Getwd()
@@ -100,7 +96,6 @@ func (rndr *Renderer) BuildSiteModel() {
         src := filepath.Join(wd, path)
         url := URL(strings.TrimPrefix(path, rndr.config.Paths.Root))
 
-        log.Printf("loading file: %s", d.Name())
         dat, err := os.ReadFile(src)
         if err != nil { return err }
 
@@ -121,10 +116,12 @@ func (rndr *Renderer) BuildSiteModel() {
     os.RemoveAll(path.Join(wd, rndr.config.Paths.Build))
 
     fs.WalkDir(rndr.fs(), rndr.config.Paths.Root, rndrFunc)
-    fmt.Println(rndr.site)
 }
 func (rndr *Renderer) Template() *template.Template {
     return rndr.templates
+}
+func (rndr *Renderer) Config() config.Config {
+    return rndr.config
 }
 func (rndr *Renderer) Site() *Site {
     return &rndr.site

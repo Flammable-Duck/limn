@@ -1,12 +1,12 @@
 package render
 
 import (
-	"fmt"
-	"html/template"
-	"io"
-	"log"
-	"path/filepath"
-	"strings"
+    "fmt"
+    "html/template"
+    "io"
+    "log"
+    "path/filepath"
+    "strings"
 )
 
 
@@ -114,7 +114,12 @@ func (s *Site) Render(w io.Writer, tmpl *template.Template, path string) error {
 }
 func (s Site) String() (str string) {
     for name, page := range s.pages {
-        str = fmt.Sprintf("%s\n%-15s #%s\n%s", str, name, page.Title(), page)
+        template := page.Template()
+        if template != "" {
+            template = fmt.Sprintf("[%s]", template)
+        }
+        str = fmt.Sprintf("%s\n%-20s #%s %s\n%s",
+            str, name, page.Title(), template, page)
     }
     return str
 }
@@ -140,8 +145,12 @@ func (p *Page) Template() string {
 }
 func (p Page) String() (str string) {
     for name, note := range p.Notes() {
-        str = fmt.Sprintf("%s- %-15s | %s\n",
-            str, name, note.Title())
+        template := note.Template()
+        if template != "" {
+            template = fmt.Sprintf("[%s]", template)
+        }
+        str = fmt.Sprintf("%s- %-25s | %s %s\n",
+            str, name, note.Title(), template)
     }
     return
 }

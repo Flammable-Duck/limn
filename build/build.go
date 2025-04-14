@@ -5,6 +5,7 @@ import (
 	"limn/render"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 )
 
@@ -53,7 +54,12 @@ func BuildSite(rndr *render.Renderer, siteDir string) {
         if err != nil {
             return err
         }
-        
+		err = runScript(absPath, rndr.Config().Scripts)
+		if err != nil {
+			log.Fatalf("err while running script %s: %s",
+				rndr.Config().Scripts[filepath.Ext(path)],
+				err)
+		}
         return nil
     }
     os.RemoveAll(filepath.Join(siteDir, "build"))
@@ -62,3 +68,10 @@ func BuildSite(rndr *render.Renderer, siteDir string) {
     if err != nil { log.Fatal(err) }
 }
 
+func runScript(path string, scripts map[string]string) error {
+	script, ok := scripts[filepath.Ext(path)]
+	if !ok { return nil }
+	cmd := exec.Command(script, path)
+	err := cmd.Run()
+	return err
+}
